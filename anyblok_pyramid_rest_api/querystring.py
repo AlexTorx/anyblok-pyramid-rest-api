@@ -74,8 +74,9 @@ class QueryString:
                 res = self.get_model_and_key_from_relationship(
                     query, self.Model, key.split('.'))
                 if isinstance(res, tuple):
-                    _query, _model, _key = res
-                    condition = self.update_filter(_model, _key, op, value)
+                    _query, _model, _key, _json_keys = res
+                    condition = self.update_filter(
+                            _model, _key, op, value, _json_keys)
                     if condition is not None:
                         if mode == 'include':
                             query = _query.filter(condition)
@@ -221,7 +222,7 @@ class QueryString:
                 res = self.get_model_and_key_from_relationship(
                     query, self.Model, key.split('.'))
                 if isinstance(res, tuple):
-                    _query, _model, _key = res
+                    _query, _model, _key, _json_keys = res
                     query = _query.order_by(
                         getattr(getattr(_model, _key), op)())
 
@@ -248,7 +249,7 @@ class QueryString:
 
         return query
 
-    def update_or_filter(self, model, key, op, value):
+    def update_or_filter(self, model, key, op, value, json_keys=None):
         if not value:
             self.request.errors.add(
                 'querystring', '400 Bad Request',
@@ -257,31 +258,40 @@ class QueryString:
             self.request.errors.status = 400
             return
         return or_(*[
-            self.update_filter(model, key, op, v.strip())
+            self.update_filter(model, key, op, v.strip(), json_keys)
             for v in value.split(',')
         ])
 
-    def update_filter(self, model, key, op, value):
+    def update_filter(self, model, key, op, value, json_keys=None):
+
+        attr = getattr(model, key)
+
+        if json_keys:
+            for json_key in json_keys:
+                attr = attr[json_key]
+            attr = attr.astext
+
         if op == "eq":
-            return getattr(model, key) == value
+            return attr == value
         elif op in ("like", "ilike"):
-            return getattr(getattr(model, key), op)("%" + value + "%")
+            return getattr(attr, op)("%" + value + "%")
         elif op == "lt":
-            return getattr(model, key) < value
+            return attr < value
         elif op == "lte":
-            return getattr(model, key) <= value
+            return attr <= value
         elif op == "gt":
-            return getattr(model, key) > value
+            return attr > value
         elif op == "gte":
-            return getattr(model, key) >= value
+            return attr >= value
         elif op == "in":
             # ensure we have a comma separated value string...
             if value:
                 values = value.split(',')
-                return getattr(model, key).in_(values)
+                return attr.in_(values)
             error = 'Filter %r except a comma separated string value' % op
         elif op.startswith("or-"):
-            return self.update_or_filter(model, key, op.split('-')[1], value)
+            return self.update_or_filter(
+                    model, key, op.split('-')[1], value, json_keys)
 
         self.request.errors.add('querystring', '400 Bad Request', error)
         self.request.errors.status = 400
@@ -307,11 +317,18 @@ class QueryString:
         key = keys[0]
         if not hasattr(model, 'fields_description'):
             return '%r is not an SQL Model you should use Adapter' % model
-        if key not in model.fields_description():
+
+        fields = model.fields_description()
+        if key not in fields:
             return '%r does not exist in model %s.' % (key, model)
 
+        if 'type' in fields.get(key).keys() and fields.get(key).get(
+                'type') == 'Jsonb':
+            logger.info('Column %s is a Jsonb column' % key)
+            return (query, model, keys[0], keys[1:])
+
         if len(keys) == 1:
-            return (query, model, keys[0])
+            return (query, model, keys[0], None)
         else:
             field = getattr(model, key)
             new_model = self.get_remote_model_for(model, key)
