@@ -13,6 +13,13 @@ from anyblok.relationship import Many2One
 from .conftest import init_registry_with_bloks
 
 
+try:
+    from anyblok_postgres.column import Jsonb
+    has_anyblok_postgres = True
+except Exception:
+    has_anyblok_postgres = False
+
+
 def add_integer_class():
 
     from anyblok import Declarations
@@ -37,10 +44,17 @@ def add_many2one_class():
         id = Integer(primary_key=True)
         test = Many2One(model=Declarations.Model.Test)
 
-    @Declarations.register(Declarations.Model)
-    class Test3:
-        id = Integer(primary_key=True)
-        test2 = Many2One(model=Declarations.Model.Test2)
+    if has_anyblok_postgres:
+        @Declarations.register(Declarations.Model)
+        class Test3:
+            id = Integer(primary_key=True)
+            test2 = Many2One(model=Declarations.Model.Test2)
+            json = Jsonb(label='json column')
+    else:
+        @Declarations.register(Declarations.Model)
+        class Test3:
+            id = Integer(primary_key=True)
+            test2 = Many2One(model=Declarations.Model.Test2)
 
 
 class MockRequestError:
@@ -621,3 +635,76 @@ class TestQueryStringWithM2O:
             query, model, ['test2', 'test', 'name'])
         assert res[1] is registry.Test
         assert res[2] == 'name'
+
+
+@pytest.mark.skipif(not has_anyblok_postgres,
+                    reason='anyblok_postgres not installed')
+class TestQueryStringWithJson:
+
+    @pytest.fixture(autouse=True)
+    def transact(self, request, registry_blok_with_m2o):
+        transaction = registry_blok_with_m2o.begin_nested()
+        request.addfinalizer(transaction.rollback)
+        return
+
+    def test_querystring_get_model_and_key_from_relationship_json(
+            self, registry_blok):
+        registry = registry_blok
+        request = MockRequest(self)
+        model = registry.Test3
+        query = model.query()
+        qs = QueryString(request, model)
+        res = qs.get_model_and_key_from_relationship(
+            query, model, ['json', 'json_column'])
+
+        assert res[1] == model
+        assert res[2] == 'json'
+        assert res[3] == ['json_column']
+
+
+    def test_querystring_get_model_and_key_from_relationship_json(
+            self, registry_blok):
+        registry = registry_blok
+        request = MockRequest(self)
+        model = registry.Test3
+        init_query = model.query()
+
+        qs = QueryString(request, model)
+        qs.filter_by = [dict(
+            key='json.key1', op='eq', value='first_value', mode='include')
+            ]
+
+        item1 = model.insert(json=dict(key1='first_value'))
+        model.insert(json=dict(key1='second_value'))
+
+        Qs = qs.from_filter_by(init_query)
+
+        query = init_query.filter(model.json['key1'].astext == 'first_value')
+
+        assert Qs.all() == query.all() == [item1]
+
+        item1 = model.insert(json=dict(
+            key1=dict(
+                key2='first_inner_value')
+            )
+        )
+        model.insert(json=dict(
+            key1=dict(
+                key2='second_inner_value')
+            )
+        )
+
+        qs.filter_by = [
+                dict(key='json.key1.key2',
+                     op='eq',
+                     value='first_inner_value',
+                     mode='include'
+                     )
+                ]
+
+        Qs = qs.from_filter_by(init_query)
+
+        query = init_query.filter(
+                model.json['key1']['key2'].astext == 'first_inner_value')
+
+        assert Qs.all() == query.all() == [item1]
