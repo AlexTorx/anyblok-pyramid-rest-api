@@ -324,7 +324,6 @@ class QueryString:
 
         if 'type' in fields.get(key).keys() and fields.get(key).get(
                 'type') == 'Jsonb':
-            logger.info('Column %s is a Jsonb column' % key)
             return (query, model, keys[0], keys[1:])
 
         if len(keys) == 1:
