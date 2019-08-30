@@ -661,8 +661,17 @@ class TestQueryStringWithJson:
         assert res[2] == 'json'
         assert res[3] == ['json_column']
 
+    def test_querystring_get_json_expression(
+            self, registry_blok):
+        registry = registry_blok
+        request = MockRequest(self)
+        model = registry.Test3
+        qs = QueryString(request, model)
+        exp = qs.get_json_expression(model, 'json', ['json_column'])
 
-    def test_querystring_get_model_and_key_from_relationship_json(
+        assert str(exp) == str(model.json['json_column'].astext)
+
+    def test_querystring_model_with_json(
             self, registry_blok):
         registry = registry_blok
         request = MockRequest(self)
