@@ -680,8 +680,7 @@ class TestQueryStringWithJson:
 
         qs = QueryString(request, model)
         qs.filter_by = [dict(
-            key='json.key1', op='eq', value='first_value', mode='include')
-            ]
+            key='json.key1', op='eq', value='first_value', mode='include')]
 
         item1 = model.insert(json=dict(key1='first_value'))
         model.insert(json=dict(key1='second_value'))
@@ -694,22 +693,18 @@ class TestQueryStringWithJson:
 
         item1 = model.insert(json=dict(
             key1=dict(
-                key2='first_inner_value')
+                key2='first_inner_value'))
             )
-        )
         model.insert(json=dict(
             key1=dict(
-                key2='second_inner_value')
+                key2='second_inner_value'))
             )
-        )
 
         qs.filter_by = [
                 dict(key='json.key1.key2',
                      op='eq',
                      value='first_inner_value',
-                     mode='include'
-                     )
-                ]
+                     mode='include')]
 
         Qs = qs.from_filter_by(init_query)
 
