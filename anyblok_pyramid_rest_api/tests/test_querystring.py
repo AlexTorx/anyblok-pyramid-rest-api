@@ -698,15 +698,15 @@ class TestQueryStringWithJson:
             key1=dict(
                 key2='second_inner_value')))
 
-        qs.filter_by = [
-                dict(key='json.key1.key2',
-                     op='eq',
-                     value='first_inner_value',
-                     mode='include')]
+        qs.filter_by = [dict(
+            key='json.key1.key2',
+            op='eq',
+            value='first_inner_value',
+            mode='include')]
 
         Qs = qs.from_filter_by(init_query)
 
-        query = init_query.filter(
-                model.json['key1']['key2'].astext == 'first_inner_value')
+        query = init_query.filter(model.json[
+            'key1']['key2'].astext == 'first_inner_value')
 
         assert Qs.all() == query.all() == [item1]
