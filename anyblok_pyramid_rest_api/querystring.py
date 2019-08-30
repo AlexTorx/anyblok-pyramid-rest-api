@@ -76,7 +76,7 @@ class QueryString:
                 if isinstance(res, tuple):
                     _query, _model, _key, _json_keys = res
                     condition = self.update_filter(
-                            _model, _key, op, value, _json_keys)
+                        _model, _key, op, value, _json_keys)
                     if condition is not None:
                         if mode == 'include':
                             query = _query.filter(condition)
@@ -262,36 +262,42 @@ class QueryString:
             for v in value.split(',')
         ])
 
-    def update_filter(self, model, key, op, value, json_keys=None):
+    def get_json_expression(self, model, key, json_keys=None):
 
-        attr = getattr(model, key)
+        exp = getattr(model, key)
 
         if json_keys:
             for json_key in json_keys:
-                attr = attr[json_key]
-            attr = attr.astext
+                exp = exp[json_key]
+            exp = exp.astext
+
+        return exp
+
+    def update_filter(self, model, key, op, value, json_keys=None):
+
+        exp = self.get_json_expression(model, key, json_keys)
 
         if op == "eq":
-            return attr == value
+            return exp == value
         elif op in ("like", "ilike"):
-            return getattr(attr, op)("%" + value + "%")
+            return getattr(exp, op)("%" + value + "%")
         elif op == "lt":
-            return attr < value
+            return exp < value
         elif op == "lte":
-            return attr <= value
+            return exp <= value
         elif op == "gt":
-            return attr > value
+            return exp > value
         elif op == "gte":
-            return attr >= value
+            return exp >= value
         elif op == "in":
             # ensure we have a comma separated value string...
             if value:
                 values = value.split(',')
-                return attr.in_(values)
+                return exp.in_(values)
             error = 'Filter %r except a comma separated string value' % op
         elif op.startswith("or-"):
             return self.update_or_filter(
-                    model, key, op.split('-')[1], value, json_keys)
+                model, key, op.split('-')[1], value, json_keys)
 
         self.request.errors.add('querystring', '400 Bad Request', error)
         self.request.errors.status = 400
