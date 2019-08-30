@@ -693,12 +693,10 @@ class TestQueryStringWithJson:
 
         item1 = model.insert(json=dict(
             key1=dict(
-                key2='first_inner_value'))
-            )
+                key2='first_inner_value')))
         model.insert(json=dict(
             key1=dict(
-                key2='second_inner_value'))
-            )
+                key2='second_inner_value')))
 
         qs.filter_by = [
                 dict(key='json.key1.key2',
