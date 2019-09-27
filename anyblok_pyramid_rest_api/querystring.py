@@ -279,7 +279,7 @@ class QueryString:
             if value:
                 values = value.split(',')
                 return getattr(model, key).in_(values)
-            error = 'Filter %r except a comma separated string value' % op
+            error = 'Filter %r expects a comma separated string value' % op
         elif op.startswith("or-"):
             return self.update_or_filter(model, key, op.split('-')[1], value)
 
